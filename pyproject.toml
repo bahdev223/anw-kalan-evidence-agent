@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anw-kalan-evidence-agent"
+version = "0.1.0"
+description = "Human-governed longitudinal learning evidence agent for the African Agentic AI Design Challenge."
+requires-python = ">=3.11"
+license = {text = "AGPL-3.0"}
+dependencies = [
+  "mcp>=2.0.0",
+  "langgraph>=0.2.0",
+  "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+anw-kalan-evidence-mcp = "anw_kalan_evidence_agent.server:main"
+anw-kalan-evidence-demo = "anw_kalan_evidence_agent.orchestration:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
