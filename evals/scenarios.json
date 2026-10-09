@@ -1,0 +1,157 @@
+[
+  {
+    "id": "E01",
+    "title": "No evidence",
+    "evidence": [],
+    "expected_state": "not_evaluated"
+  },
+  {
+    "id": "E02",
+    "title": "Assisted success only",
+    "evidence": [
+      {
+        "id": "e1",
+        "kind": "guided_attempt",
+        "score": 0.9,
+        "assisted": true
+      }
+    ],
+    "expected_state": "acquiring",
+    "invariant": "must_not_be_mastered"
+  },
+  {
+    "id": "E03",
+    "title": "Repeated independent failures",
+    "evidence": [
+      {
+        "id": "e1",
+        "kind": "independent_attempt",
+        "score": 0.4,
+        "assisted": false
+      },
+      {
+        "id": "e2",
+        "kind": "independent_attempt",
+        "score": 0.5,
+        "assisted": false
+      }
+    ],
+    "expected_state": "fragile"
+  },
+  {
+    "id": "E04",
+    "title": "First independent success",
+    "evidence": [
+      {
+        "id": "e1",
+        "kind": "guided_attempt",
+        "score": 0.9,
+        "assisted": true
+      },
+      {
+        "id": "e2",
+        "kind": "independent_attempt",
+        "score": 0.8,
+        "assisted": false
+      }
+    ],
+    "expected_state": "acquiring"
+  },
+  {
+    "id": "E05",
+    "title": "Mastery evidence",
+    "evidence": [
+      {
+        "id": "e1",
+        "kind": "independent_attempt",
+        "score": 0.8,
+        "assisted": false
+      },
+      {
+        "id": "e2",
+        "kind": "artifact",
+        "score": 0.85,
+        "assisted": false
+      },
+      {
+        "id": "e3",
+        "kind": "explanation",
+        "score": 0.8,
+        "assisted": false
+      },
+      {
+        "id": "e4",
+        "kind": "transfer",
+        "score": 0.75,
+        "assisted": false
+      }
+    ],
+    "expected_state": "mastered"
+  },
+  {
+    "id": "E06",
+    "title": "Advanced with delayed retention",
+    "evidence": [
+      {
+        "id": "e1",
+        "kind": "independent_attempt",
+        "score": 0.8,
+        "assisted": false
+      },
+      {
+        "id": "e2",
+        "kind": "artifact",
+        "score": 0.85,
+        "assisted": false
+      },
+      {
+        "id": "e3",
+        "kind": "explanation",
+        "score": 0.8,
+        "assisted": false
+      },
+      {
+        "id": "e4",
+        "kind": "transfer",
+        "score": 0.75,
+        "assisted": false
+      },
+      {
+        "id": "e5",
+        "kind": "delayed_review",
+        "score": 0.8,
+        "assisted": false
+      }
+    ],
+    "expected_state": "advanced"
+  },
+  {
+    "id": "E07",
+    "title": "Human approval required",
+    "expected": {
+      "requires_human_approval": true,
+      "initial_status": "proposed"
+    }
+  },
+  {
+    "id": "E08",
+    "title": "Teacher rejection persists",
+    "expected": {
+      "final_status": "rejected"
+    }
+  },
+  {
+    "id": "E09",
+    "title": "Evidence IDs remain grounded",
+    "expected": {
+      "invented_evidence_ids": 0
+    }
+  },
+  {
+    "id": "E10",
+    "title": "LLM cannot override engine state",
+    "expected": {
+      "authority": "deterministic_engine"
+    }
+  }
+]
