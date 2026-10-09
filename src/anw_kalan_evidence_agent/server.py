@@ -142,11 +142,7 @@ def propose_next_learning_action(
 def apply_human_approved_decision(
     approval_id: str,
 ) -> dict[str, Any]:
-    """Apply a one-time approval grant created outside MCP by a human action.
-
-    The agent cannot generate the approval grant itself. An invalid, missing or
-    already-consumed grant is rejected.
-    """
+    """Apply a one-time approval grant created outside MCP by a human action."""
 
     args = {"approval_id": approval_id}
 
