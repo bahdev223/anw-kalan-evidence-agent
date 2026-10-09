@@ -46,9 +46,10 @@ The first-party MCP server exposes a narrow set of tools:
 - analyze_learning_evidence
 - get_curriculum_context
 - propose_next_learning_action
-- record_teacher_decision
+- apply_human_approved_decision
+- get_tool_audit_log
 
-The last tool performs a real write, but only records the teacher's explicit decision. The AI cannot approve its own recommendation.
+The action tool performs a real write only after receiving a one-time approval grant created outside MCP by an explicit human action. The AI cannot create that grant or approve its own recommendation.
 
 ## Repository layout
 
