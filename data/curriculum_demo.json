@@ -1,0 +1,25 @@
+{
+  "synthetic": true,
+  "learners": {
+    "learner-demo-001": {
+      "level": "Lower secondary demo",
+      "subject": "Mathematics",
+      "language": "French / Bamanankan-ready",
+      "competencies": {
+        "math.fractions.unlike-denominators": {
+          "title": "Add fractions with unlike denominators",
+          "prerequisites": [
+            "math.fractions.equivalent-fractions",
+            "math.arithmetic.lcm"
+          ],
+          "expected_evidence": [
+            "independent_attempt",
+            "explanation",
+            "transfer",
+            "delayed_review"
+          ]
+        }
+      }
+    }
+  }
+}
