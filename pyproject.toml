@@ -12,6 +12,8 @@ dependencies = [
   "mcp>=2.0.0",
   "langgraph>=0.2.0",
   "httpx>=0.27.0",
+  "starlette>=0.40.0",
+  "uvicorn>=0.30.0",
 ]
 
 [project.optional-dependencies]
@@ -20,7 +22,7 @@ dev = [
 ]
 
 [project.scripts]
-anw-kalan-evidence-mcp = "anw_kalan_evidence_agent.server:main"
+anw-kalan-evidence-mcp = "anw_kalan_evidence_agent.cli:serve"
 anw-kalan-evidence-demo = "anw_kalan_evidence_agent.orchestration:main"
 
 [tool.setuptools.packages.find]
