@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from anw_kalan_evidence_agent.models import (
     ActionProposal,
     HumanDecisionKind,
@@ -21,7 +23,7 @@ def proposal() -> ActionProposal:
     )
 
 
-def test_proposal_stays_proposed_until_human_decides(tmp_path):
+def test_proposal_stays_proposed_without_human_grant(tmp_path):
     store = ChallengeStore(str(tmp_path / "test.sqlite3"))
     item = proposal()
     store.save_proposal(item)
@@ -31,16 +33,45 @@ def test_proposal_stays_proposed_until_human_decides(tmp_path):
     assert saved.requires_human_approval is True
 
 
-def test_teacher_can_reject_proposal(tmp_path):
+def test_valid_human_grant_can_reject_proposal(tmp_path):
     store = ChallengeStore(str(tmp_path / "test.sqlite3"))
     item = proposal()
     store.save_proposal(item)
 
-    store.record_teacher_decision(
+    approval_id = store.create_human_approval(
         item.id,
         HumanDecisionKind.REJECT,
         note="Teacher wants another diagnostic first.",
     )
+    store.apply_human_approval(approval_id)
 
     saved = store.get_proposal(item.id)
     assert saved.status == ProposalStatus.REJECTED
+
+
+def test_human_grant_is_one_time_only(tmp_path):
+    store = ChallengeStore(str(tmp_path / "test.sqlite3"))
+    item = proposal()
+    store.save_proposal(item)
+
+    approval_id = store.create_human_approval(
+        item.id,
+        HumanDecisionKind.ACCEPT,
+    )
+    store.apply_human_approval(approval_id)
+
+    with pytest.raises(ValueError):
+        store.apply_human_approval(approval_id)
+
+
+def test_modify_requires_a_human_supplied_replacement(tmp_path):
+    store = ChallengeStore(str(tmp_path / "test.sqlite3"))
+    item = proposal()
+    store.save_proposal(item)
+
+    with pytest.raises(ValueError):
+        store.create_human_approval(
+            item.id,
+            HumanDecisionKind.MODIFY,
+            modified_action="",
+        )
