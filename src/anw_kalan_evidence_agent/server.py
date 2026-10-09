@@ -6,7 +6,6 @@ from mcp.server import MCPServer
 
 from .curriculum import get_curriculum_context as load_curriculum_context
 from .evidence_engine import EvidenceEngine
-from .models import HumanDecisionKind
 from .recommendation_engine import RecommendationEngine
 from .store import ChallengeStore
 
@@ -19,7 +18,7 @@ mcp_server = MCPServer(
     "anw-kalan-evidence-agent",
     instructions=(
         "Human-governed learning-evidence tools. "
-        "The agent may analyze and propose, but it may not accept its own proposal. "
+        "The agent may analyze and propose, but it cannot create human approval. "
         "Every learning claim must be backed by evidence IDs."
     ),
 )
@@ -112,7 +111,7 @@ def propose_next_learning_action(
     learner_id: str,
     competency_id: str,
 ) -> dict[str, Any]:
-    """Create a proposal that always requires explicit human approval."""
+    """Create a grounded proposal that always requires explicit human approval."""
 
     args = {
         "learner_id": learner_id,
@@ -120,57 +119,57 @@ def propose_next_learning_action(
     }
 
     def operation() -> dict[str, Any]:
+        curriculum = load_curriculum_context(learner_id, competency_id)
+        if not curriculum.get("found"):
+            raise ValueError(
+                "The competency is outside the learner's permitted curriculum context."
+            )
         items = store.list_evidence(learner_id, competency_id)
         summary = evidence_engine.analyze(
             learner_id, competency_id, items
         )
         proposal = recommendation_engine.propose(summary)
         store.save_proposal(proposal)
-        return proposal.to_dict()
+        return {
+            **proposal.to_dict(),
+            "curriculum_context": curriculum,
+        }
 
     return _audited("propose_next_learning_action", args, operation)
 
 
 @mcp_server.tool()
-def record_teacher_decision(
-    proposal_id: str,
-    decision: str,
-    note: str = "",
-    modified_action: str = "",
+def apply_human_approved_decision(
+    approval_id: str,
 ) -> dict[str, Any]:
-    """Persist a teacher's accept/modify/reject decision.
+    """Apply a one-time approval grant created outside MCP by a human action.
 
-    This is the write/action tool. It cannot be used without an explicit human
-    decision value, and the AI has no separate self-approval capability.
+    The agent cannot generate the approval grant itself. An invalid, missing or
+    already-consumed grant is rejected.
     """
 
-    args = {
-        "proposal_id": proposal_id,
-        "decision": decision,
-        "note": note,
-        "modified_action": modified_action,
-    }
+    args = {"approval_id": approval_id}
 
     def operation() -> dict[str, Any]:
-        try:
-            parsed = HumanDecisionKind(decision)
-        except ValueError as exc:
-            raise ValueError(
-                "decision must be one of: accept, modify, reject"
-            ) from exc
-        result = store.record_teacher_decision(
-            proposal_id=proposal_id,
-            decision=parsed,
-            note=note,
-            modified_action=modified_action,
-        )
-        proposal = store.get_proposal(proposal_id)
+        result = store.apply_human_approval(approval_id)
+        proposal = store.get_proposal(result.proposal_id)
         return {
             "human_decision": result.to_dict(),
             "proposal": proposal.to_dict(),
         }
 
-    return _audited("record_teacher_decision", args, operation)
+    return _audited("apply_human_approved_decision", args, operation)
+
+
+@mcp_server.tool()
+def get_tool_audit_log() -> dict[str, Any]:
+    """Read the challenge tool-call audit trail for the demo."""
+
+    return _audited(
+        "get_tool_audit_log",
+        {},
+        lambda: {"calls": store.list_tool_calls()},
+    )
 
 
 @mcp_server.resource(
