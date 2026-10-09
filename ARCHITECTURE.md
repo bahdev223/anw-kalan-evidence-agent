@@ -19,7 +19,8 @@ First-party MCP server
   | analyze_learning_evidence
   | get_curriculum_context
   | propose_next_learning_action
-  | record_teacher_decision
+  | apply_human_approved_decision
+  | get_tool_audit_log
         |
         v
 Deterministic Evidence Engine
@@ -77,7 +78,7 @@ A proposal remains proposed until a teacher explicitly chooses one of:
 - modify;
 - reject.
 
-The AI has no tool that can accept its own proposal.
+The AI has no tool that can create a human approval grant. The human interface creates a one-time grant; the MCP action tool can only consume that already-authorized grant.
 
 ### 5. Auditability
 
