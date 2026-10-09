@@ -20,6 +20,7 @@ from .models import (
 class ChallengeStore:
     def __init__(self, path: str | None = None) -> None:
         self.path = Path(path or os.getenv("EVIDENCE_DB_PATH", "challenge.sqlite3"))
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -53,6 +54,17 @@ class ChallengeStore:
                     requires_human_approval INTEGER NOT NULL,
                     status TEXT NOT NULL,
                     created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS human_approval_grants (
+                    id TEXT PRIMARY KEY,
+                    proposal_id TEXT NOT NULL,
+                    decision TEXT NOT NULL,
+                    note TEXT NOT NULL,
+                    modified_action TEXT NOT NULL,
+                    issued_at TEXT NOT NULL,
+                    consumed_at TEXT,
+                    FOREIGN KEY(proposal_id) REFERENCES proposals(id)
                 );
 
                 CREATE TABLE IF NOT EXISTS teacher_decisions (
@@ -156,6 +168,10 @@ class ChallengeStore:
             ).fetchone()
         if row is None:
             raise KeyError(f"Unknown proposal: {proposal_id}")
+        return self._proposal_from_row(row)
+
+    @staticmethod
+    def _proposal_from_row(row: sqlite3.Row) -> ActionProposal:
         return ActionProposal(
             id=row["id"],
             learner_id=row["learner_id"],
@@ -168,35 +184,80 @@ class ChallengeStore:
             created_at=row["created_at"],
         )
 
-    def record_teacher_decision(
+    def create_human_approval(
         self,
         proposal_id: str,
         decision: HumanDecisionKind,
         note: str = "",
         modified_action: str = "",
-    ) -> HumanDecision:
+    ) -> str:
+        """Human/UI boundary. This method is intentionally NOT an MCP tool."""
+
         proposal = self.get_proposal(proposal_id)
-        if proposal.status is not ProposalStatus.PROPOSED:
+        if proposal.status != ProposalStatus.PROPOSED:
             raise ValueError("This proposal has already received a human decision.")
-        if decision is HumanDecisionKind.MODIFY and not modified_action.strip():
+        if decision == HumanDecisionKind.MODIFY and not modified_action.strip():
             raise ValueError("A modified action is required when decision=modify.")
 
-        decided_at = datetime.now(timezone.utc).isoformat()
-        human_decision = HumanDecision(
-            id=str(uuid4()),
-            proposal_id=proposal_id,
-            decision=decision,
-            note=note.strip(),
-            modified_action=modified_action.strip(),
-            decided_at=decided_at,
-        )
-        next_status = {
-            HumanDecisionKind.ACCEPT: ProposalStatus.ACCEPTED,
-            HumanDecisionKind.MODIFY: ProposalStatus.MODIFIED,
-            HumanDecisionKind.REJECT: ProposalStatus.REJECTED,
-        }[decision]
-
+        approval_id = str(uuid4())
         with self._connect() as db:
+            db.execute(
+                """
+                INSERT INTO human_approval_grants
+                (id, proposal_id, decision, note, modified_action, issued_at, consumed_at)
+                VALUES (?, ?, ?, ?, ?, ?, NULL)
+                """,
+                (
+                    approval_id,
+                    proposal_id,
+                    decision.value,
+                    note.strip(),
+                    modified_action.strip(),
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+        return approval_id
+
+    def apply_human_approval(self, approval_id: str) -> HumanDecision:
+        """Consume a one-time grant previously created by a human/UI action."""
+
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            grant = db.execute(
+                "SELECT * FROM human_approval_grants WHERE id = ?",
+                (approval_id,),
+            ).fetchone()
+            if grant is None:
+                raise KeyError("Unknown human approval grant.")
+            if grant["consumed_at"]:
+                raise ValueError("This human approval grant has already been consumed.")
+
+            proposal_row = db.execute(
+                "SELECT * FROM proposals WHERE id = ?",
+                (grant["proposal_id"],),
+            ).fetchone()
+            if proposal_row is None:
+                raise KeyError("The proposal attached to this approval no longer exists.")
+            proposal = self._proposal_from_row(proposal_row)
+            if proposal.status != ProposalStatus.PROPOSED:
+                raise ValueError("This proposal is no longer awaiting a human decision.")
+
+            decision = HumanDecisionKind(grant["decision"])
+            next_status = {
+                HumanDecisionKind.ACCEPT: ProposalStatus.ACCEPTED,
+                HumanDecisionKind.MODIFY: ProposalStatus.MODIFIED,
+                HumanDecisionKind.REJECT: ProposalStatus.REJECTED,
+            }[decision]
+            result = HumanDecision(
+                id=str(uuid4()),
+                proposal_id=proposal.id,
+                decision=decision,
+                note=grant["note"],
+                modified_action=grant["modified_action"],
+                decided_at=now,
+            )
+
             db.execute(
                 """
                 INSERT INTO teacher_decisions
@@ -204,19 +265,23 @@ class ChallengeStore:
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    human_decision.id,
-                    proposal_id,
-                    decision.value,
-                    human_decision.note,
-                    human_decision.modified_action,
-                    human_decision.decided_at,
+                    result.id,
+                    result.proposal_id,
+                    result.decision.value,
+                    result.note,
+                    result.modified_action,
+                    result.decided_at,
                 ),
             )
             db.execute(
                 "UPDATE proposals SET status = ? WHERE id = ?",
-                (next_status.value, proposal_id),
+                (next_status.value, proposal.id),
             )
-        return human_decision
+            db.execute(
+                "UPDATE human_approval_grants SET consumed_at = ? WHERE id = ?",
+                (now, approval_id),
+            )
+        return result
 
     def log_tool_call(
         self,
